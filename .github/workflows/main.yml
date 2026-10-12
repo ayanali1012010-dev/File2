@@ -13,13 +13,25 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Extract Project Zip
+        run: |
+          unzip -o ArchiveX.zip -d extracted_project
+          # अगर ज़िप के अंदर एक मुख्य फोल्डर बना है तो फाइल्स बाहर लाएं
+          if [ ! -f "extracted_project/build.gradle" ] && [ ! -f "extracted_project/build.gradle.kts" ]; then
+            SUBDIR=$(find extracted_project -maxdepth 1 -mindepth 1 -type d | head -n 1)
+            if [ -n "$SUBDIR" ]; then
+              cp -r "$SUBDIR"/* extracted_project/ 2>/dev/null || true
+            fi
+          fi
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Gradle Wrapper (if missing)
+      - name: Setup Gradle Wrapper
+        working-directory: extracted_project
         run: |
           if [ ! -f "gradlew" ]; then
             gradle wrapper
@@ -27,10 +39,11 @@ jobs:
           chmod +x gradlew
 
       - name: Build APK with Gradle
+        working-directory: extracted_project
         run: ./gradlew assembleDebug --no-daemon --stacktrace -Dorg.gradle.jvmargs="-Xmx3072m -XX:MaxMetaspaceSize=512m"
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
-          path: "**/build/outputs/apk/debug/*.apk"
+          path: extracted_project/**/build/outputs/apk/debug/*.apk
